@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css"> 
+    <title>Chat Room</title>
+</head>
+<body>
+    <h1 id="roomName">Chat Room</h1>
+    <p id="roomDescription"></p>
+    <p>Capacity: <span id="roomCapacity"></span></p>
+    
+    <div id="messages"></div> 
+    <input id="messageInput" type="text" placeholder="Type your message..." />
+    <button id="sendMessage">Send</button>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io(); 
+        const roomId = window.location.pathname.split('/').pop(); // Extraí o ID
+
+        // Enviar uma mensagem ao se conectar à sala
+        socket.emit('joinRoom', roomId);
+
+        // Receber mensagens e exibir no chat
+        socket.on('message', (message) => {
+            console.log('Mensagem recebida:', message); 
+            displayMessage(message);
+        });
+
+        // Função para exibir a mensagem
+        function displayMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            const messageElement = document.createElement('p');
+            messageElement.textContent = message.content; 
+            messagesDiv.appendChild(messageElement); 
+        }
+
+        // Enviar mensagem
+        document.getElementById('sendMessage').addEventListener('click', () => {
+            const messageInput = document.getElementById('messageInput');
+            const userId = localStorage.getItem('userId');
+
+            if (messageInput.value.trim() && userId) {
+                const messageData = {
+                    roomId: roomId,
+                    userId: userId,
+                    content: messageInput.value.trim() 
+                };
+                console.log('Enviando mensagem:', messageData);
+                socket.emit('message', messageData);
+                messageInput.value = '';
+            } else {
+                alert('Por favor, digite uma mensagem.');
+            }
+        });
+
+        // Verificar se o token está expirado
+        function isTokenExpired(token) {
+            if (!token) return true; // Se não há token, considera como expirado
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const exp = payload.exp; 
+            const currentTime = Math.floor(Date.now() / 1000); 
+            return exp < currentTime;
+        }
+
+        // Carregar a sala de chat ao abrir a página
+        async function loadChatRoom() {
+            const token = localStorage.getItem('token');
+            if (isTokenExpired(token)) {
+                alert('Token expired. Please log in again.');
+                window.location.href = '/login.html'; 
+                return; 
+            }
+
+            try {
+                const roomId = window.location.pathname.split('/').pop(); 
+                const response = await fetch(`/api/chat/chat-rooms/${roomId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`, 
+                    },
+                });
+
+                if (response.ok) {
+                    const room = await response.json();
+                    document.getElementById('roomName').textContent = room.name;
+                    document.getElementById('roomDescription').textContent = room.description;
+                    document.getElementById('roomCapacity').textContent = room.capacity;
+
+                    // Carregar mensagens da sala
+                    loadMessages(); 
+                } else {
+                    console.error('Error fetching chat room:', response.status);
+                    alert('Failed to load chat room. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error loading chat room:', error);
+                alert('Error loading chat room');
+            }
+        }
+
+        // Função para carregar mensagens da sala
+        async function loadMessages() {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`/api/chat/chat-rooms/${roomId}/messages`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+
+                if (response.ok) {
+                    const messages = await response.json();
+                    messages.forEach(displayMessage); 
+                } else {
+                    console.error('Error fetching messages:', response.status);
+                    alert('Failed to load messages. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error loading messages:', error);
+                alert('Error loading messages');
+            }
+        }
+
+        // Verificar a expiração do token a cada 10 segundos
+        function checkTokenExpiration() {
+            const token = localStorage.getItem('token');
+            if (isTokenExpired(token)) {
+                alert('Token expired. Please log in again.');
+                window.location.href = '/login.html'; 
+            }
+        }
+
+        loadChatRoom(); 
+        setInterval(checkTokenExpiration, 10000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css"> 
+
+    <title>Chat Rooms</title>
+</head>
+<body>
+    <h1>Chat Rooms</h1>
+    
+    <form id="createRoomForm">
+        <input type="text" name="name" placeholder="Room Name" required>
+        <input type="text" name="description" placeholder="Room Description" required>
+        <input type="number" name="capacity" placeholder="Capacity" required>
+        <button type="submit">Create Room</button>
+    </form>
+
+    <h2>Existing Rooms</h2>
+    <ul id="roomList"></ul>
+
+    <h2>Your Token:</h2>
+    <pre id="tokenDisplay"></pre>
+
+    <script>
+        const storedToken = localStorage.getItem('token');
+        document.getElementById('tokenDisplay').textContent = storedToken || 'No token found';
+
+        document.getElementById('createRoomForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch('/api/chat/chat-rooms', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${storedToken}`, // Enviar o token no cabeçalho
+                    },
+                    body: JSON.stringify(data),
+                });
+
+                if (response.ok) {
+                    await loadRooms();
+                } else {
+                    const error = await response.json();
+                    alert(error.message);
+                }
+            } catch (error) {
+                console.error('Error creating chat room:', error);
+                alert('Error creating chat room');
+            }
+        });
+
+        // Função para carregar as salas de chat existentes
+        async function loadRooms() {
+            try {
+                const response = await fetch('/api/chat/chat-rooms', {
+                    headers: {
+                        'Authorization': `Bearer ${storedToken}`,
+                    },
+                });
+
+                if (response.ok) {
+                    const rooms = await response.json();
+                    const roomList = document.getElementById('roomList');
+                    roomList.innerHTML = '';
+                    rooms.forEach(room => {
+                        const li = document.createElement('li');
+                        const link = document.createElement('a');
+                        link.href = `/chat/${room._id}`;
+                        link.textContent = `${room.name} - ${room.description} (Capacity: ${room.capacity})`;
+                        li.appendChild(link);
+                        roomList.appendChild(li);
+                    });
+                } else {
+                    console.error('Error fetching rooms');
+                }
+            } catch (error) {
+                console.error('Error loading rooms:', error);
+            }
+        }
+        loadRooms();
+    </script>
+</body>
+</html>
