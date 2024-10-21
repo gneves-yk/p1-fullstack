@@ -1,0 +1,25 @@
+version: '3.9'
+services:
+  mongodb:
+    image: mongo:8.0.1
+    container_name: chat_mongo
+    networks:
+      - composer-bridge
+    ports:
+      - 27017:27017
+  
+  chat-app:
+    image: node:18
+    container_name: app_chat
+    volumes:
+      - .:/app-application
+    working_dir: /app-application
+    command: ["sh", "-c", "npm cache clean --force && npm install && npm run dev"]
+    networks:
+      - composer-bridge
+    ports:
+      - 8087:5000
+
+networks:
+ composer-bridge:
+  driver: bridge
